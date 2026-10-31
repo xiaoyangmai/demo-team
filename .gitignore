@@ -1,0 +1,19 @@
+# Hermes credentials and runtime state
+**/.env
+**/auth.json
+**/memories/
+**/sessions/
+**/state.db*
+**/response_store.db*
+**/logs/
+**/workspace/
+**/home/
+**/cache/
+**/local/
+
+# Local editor and operating-system files
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
