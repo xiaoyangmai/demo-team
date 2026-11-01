@@ -17,7 +17,7 @@ description: Use when building an offline children's quiz page.
 ## Procedure
 
 1. Read the project agent rules and record the real git revision. Write only inside the requested result directory. Do not edit profiles, skills, source, or commit.
-2. Draft the story as setup, conflict, negotiation, and result. Then write two three-choice questions whose correct choices follow that story.
+2. Draft the story as setup, conflict, negotiation, and result. Design questions around the choice the child should learn: one question applies the idea in the story, and another changes the situation while keeping the same principle. Use plausible partial solutions as alternatives, not just one helpful answer beside two obviously mean actions. Explain why each choice works or misses something and what the child can do next; do not make success depend on recalling a line verbatim.
 3. Put the same lesson object in `lesson.json` and inside the page script. Render story and questions from that object so the visible text cannot drift.
 4. Mark the correct choice, show that option's feedback, and disable the question only after a correct answer. Reset clears feedback, classes, and disabled state on every question.
 5. Write `manifest.json` with only the requested artifact entries. Write `result.json` with the profile, delivery id, actual revision, summary, checks that ran, and limits.
