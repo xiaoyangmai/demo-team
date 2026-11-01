@@ -1,0 +1,4 @@
+# This profile serves unattended Gateway tasks; execute_code requires approval.
+agent:
+  disabled_toolsets:
+    - code_execution
