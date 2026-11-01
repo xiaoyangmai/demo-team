@@ -1,0 +1,90 @@
+{
+  "profile": "frontend",
+  "cases": [
+    {
+      "id": "sharing",
+      "role": "development",
+      "topic": "两个孩子都想用同一支公用画笔，商量轮流使用；同时让孩子理解自己带来的个人物品可以自主决定是否借出。"
+    },
+    {
+      "id": "honesty",
+      "role": "development",
+      "topic": "孩子不小心弄坏同学做的纸作品，诚实说明发生的事，听取对方感受，并商量力所能及的补救。"
+    },
+    {
+      "id": "help",
+      "role": "transfer",
+      "topic": "孩子拼一幅有点难的拼图，先做力所能及的尝试，卡住时说清困难并寻求合适帮助；理解求助不等于把整件事交给别人。"
+    }
+  ],
+  "common_input": "请为中文6-8岁儿童制作一个离线学习小页面。围绕给定主题写一个有开头、困难、选择与结果的短故事，以及两道三选一选择题。每个选项都要有友善具体的反馈；答错可以重试，有重置按钮。故事与题目内容由你创作。制作单文件 index.html，内嵌 CSS/JS，手机和桌面均可用，不依赖网络、图片生成或第三方包；可用简单 CSS 装饰。另写 lesson.json：{title,age_range,learning_goal,story:[字符串],questions:[{id,prompt,options:[{id,text,feedback}],answer}]}。两题 id 为 q1/q2，各题选项 id 为 A/B/C，answer 为选项 id；页面内容须与 JSON 一致。为自动验收，题目容器用 data-question='q1'/'q2'，选项 button 用 data-option='A'/'B'/'C'，反馈元素用 data-feedback，重置按钮 id='reset'。本次制作学习页面，不制作漫画。主题：",
+  "delivery_instructions": "执行并交付实际文件。使用已登记的 demo-team 工作区，读取项目 AGENTS.md 与当前 frontend SOUL.md，确认实际 git HEAD。只在 .harness/results/{delivery_id}/ 写输出，不修改任何 profile、Skill、记忆或源码，不提交 Git，不读取其他试验的产物/评估。目录包含 index.html、lesson.json、result.json、manifest.json。result.json 必须是对象，记录 profile='frontend'、delivery_id='{delivery_id}'、source_revision 为实际 git HEAD、summary 和真实自检及局限。manifest.json 为 {\"artifacts\":[{\"path\":\"index.html\",\"name\":\"index.html\",\"kind\":\"document\",\"content_type\":\"text/html\"},{\"path\":\"lesson.json\",\"name\":\"lesson.json\",\"kind\":\"data\",\"content_type\":\"application/json\"}]}。实际检查文件及 JSON，不声称做了未做的浏览器检查。不要自行 finalize，由调用方收集。不要安装依赖或生成图片；尽量在一次实现加自检内完成。",
+  "state_control": "For this controlled pilot, disable auxiliary.background_review.enabled only for frontend via native Hermes config CLI using session-authorized development SSH, and restore its original behavior after the experiment. Record the fixed effective config and all SOUL/Skill/memory fingerprints before/after each run; verify Skill loading in trace. No global setting or source-code hotpatch. Deployment and task/result loop remain through existing HTTP APIs.",
+  "experiment": "learning-card-calibrated-retest-20261102",
+  "purpose": "Test the existing first candidate against the captured baseline after calibrating grading and stopping. No new profile optimization during this trial.",
+  "behavior_sources": {
+    "baseline": "8cb9234bf5d34e199f9aded49599c1ffeaa2ac9c",
+    "candidate": "336943f663fc7a46f67efd47cef8eeac2a4f1113"
+  },
+  "changed_file": "profiles/frontend/skills/offline-learning-card/SKILL.md",
+  "schedule": [
+    {
+      "stage": "baseline",
+      "repeat": 1,
+      "cases": [
+        "sharing",
+        "honesty",
+        "help"
+      ]
+    },
+    {
+      "stage": "candidate",
+      "repeat": 1,
+      "cases": [
+        "sharing",
+        "honesty",
+        "help"
+      ]
+    },
+    {
+      "stage": "candidate",
+      "repeat": 2,
+      "cases": [
+        "help",
+        "honesty",
+        "sharing"
+      ]
+    },
+    {
+      "stage": "baseline",
+      "repeat": 2,
+      "cases": [
+        "help",
+        "honesty",
+        "sharing"
+      ]
+    }
+  ],
+  "budget": {
+    "planned_runs": 12,
+    "max_run_seconds": 420,
+    "no_progress_stop": false,
+    "basis": "The preceding completed runs took up to 286 seconds. A 420-second total allowance provides about 47 percent headroom and is identical for both versions. This is an operational budget, not a claim about a normal latency distribution.",
+    "deadline": "Original submission wall clock; recovering observation never resets it. At the deadline read status, request stop only if still active, and confirm terminal state. Poll and HTTP latency can delay the actual stop; record it.",
+    "silence": "Partial SSE silence is diagnostic only, never proof of a hang or an early-stop condition.",
+    "recovery": "Recover the same run ID. Preserve errors and stop outcomes. No replacement generation or best-of selection.",
+    "experiment_stop": "No quality-based early stopping. Stop further submission for source/context drift, model mismatch, unavailable management/stop capability, or inability to confirm the previous run terminal. Keep all collected evidence and report an inconclusive comparison."
+  },
+  "grading": {
+    "rubric": "The calibrated rubric and blind anchor packets are frozen locally before publication; their SHA256 is recorded in this protocol.",
+    "method": "Two independent model judge contexts, opaque labels, opposite orders, visible reader content and browser evidence. Same available model family; no human grading. Score only after all runs.",
+    "calibration_gate": "Both judges classify all six synthetic anchors on the expected side of the 2/3 transfer boundary, match at least five of six transfer grades, and identify the intentional invented feedback premise (consistency <=2). Two disguised repeated anchors must retain their transfer pass/fail outcome, with no dimension differing by more than one. These are authored semantic anchors, not external ground truth. If the gate fails, revise before production and test fresh equivalent anchors once; a second failure stops quality claims.",
+    "retain_rule": "All six candidate samples pass artifact/browser gates and all four semantic dimensions >=3 for both judges with no hard failure. For EACH judge: overall total-score mean improves by at least 1/16; each topic mean is non-regressing; each repeat-block mean improves by at least 0.5/16; at least four of six matched topic/repeat pairs improve. Otherwise do not adopt the candidate.",
+    "failure_accounting": "Missing delivery is an operational gate failure, not a fabricated semantic score. Keep completion rate, conditional semantic scores, judge disagreement and all failed samples visible.",
+    "inference_limit": "A strict practical pilot gate, not statistical significance, proven child learning, broad reliability, or a true held-out test: all three topics appeared in the preceding experiment. No rubric changes or sample additions after observing these outputs.",
+    "production_repeatability_probe": "Two predetermined delivered samples are repeated under new opaque labels in each final grading batch. These copies do not increase production N. Each judge must keep the same transfer pass boundary, all dimension differences <=1 and total difference <=2; otherwise evaluator instability prevents adoption. Copies: baseline/honesty-r1 and candidate/honesty-r1; omitted only if no artifact.",
+    "rubric_sha256": "b771dbab0da21a83efc63c3826385c19b40a4c131b86083bf3f6f5646926c76e",
+    "calibration_result": "Both judges matched all 6 anchor transfer scores, all 2/3 boundaries, both hidden repeats and the planted consistency defect before production."
+  },
+  "frozen_at": "2026-11-01T20:07:14.862795+00:00"
+}
