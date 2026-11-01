@@ -1,0 +1,88 @@
+{
+  "experiment": "learning-card-profile-loop-20261102",
+  "purpose": "Test whether a focused frontend profile change improves independently evaluated artifacts through the existing Hermes delivery loop.",
+  "baseline_behavior_commit": "Established by the setup commit: prior SOUL/comic skill plus the captured runtime-generated offline-learning-card Skill.",
+  "profile": "frontend",
+  "cases": [
+    {
+      "id": "sharing",
+      "role": "development",
+      "topic": "两个孩子都想用同一支公用画笔，商量轮流使用；同时让孩子理解自己带来的个人物品可以自主决定是否借出。"
+    },
+    {
+      "id": "honesty",
+      "role": "development",
+      "topic": "孩子不小心弄坏同学做的纸作品，诚实说明发生的事，听取对方感受，并商量力所能及的补救。"
+    },
+    {
+      "id": "help",
+      "role": "transfer",
+      "topic": "孩子拼一幅有点难的拼图，先做力所能及的尝试，卡住时说清困难并寻求合适帮助；理解求助不等于把整件事交给别人。"
+    }
+  ],
+  "common_input": "请为中文6-8岁儿童制作一个离线学习小页面。围绕给定主题写一个有开头、困难、选择与结果的短故事，以及两道三选一选择题。每个选项都要有友善具体的反馈；答错可以重试，有重置按钮。故事与题目内容由你创作。制作单文件 index.html，内嵌 CSS/JS，手机和桌面均可用，不依赖网络、图片生成或第三方包；可用简单 CSS 装饰。另写 lesson.json：{title,age_range,learning_goal,story:[字符串],questions:[{id,prompt,options:[{id,text,feedback}],answer}]}。两题 id 为 q1/q2，各题选项 id 为 A/B/C，answer 为选项 id；页面内容须与 JSON 一致。为自动验收，题目容器用 data-question='q1'/'q2'，选项 button 用 data-option='A'/'B'/'C'，反馈元素用 data-feedback，重置按钮 id='reset'。本次制作学习页面，不制作漫画。主题：",
+  "delivery_instructions": "执行并交付实际文件。使用已登记的 demo-team 工作区，读取项目 AGENTS.md 与当前 frontend SOUL.md，确认实际 git HEAD。只在 .harness/results/{delivery_id}/ 写输出，不修改任何 profile、Skill、记忆或源码，不提交 Git，不读取其他试验的产物/评估。目录包含 index.html、lesson.json、result.json、manifest.json。result.json 必须是对象，记录 profile='frontend'、delivery_id='{delivery_id}'、source_revision 为实际 git HEAD、summary 和真实自检及局限。manifest.json 为 {\"artifacts\":[{\"path\":\"index.html\",\"name\":\"index.html\",\"kind\":\"document\",\"content_type\":\"text/html\"},{\"path\":\"lesson.json\",\"name\":\"lesson.json\",\"kind\":\"data\",\"content_type\":\"application/json\"}]}。实际检查文件及 JSON，不声称做了未做的浏览器检查。不要自行 finalize，由调用方收集。不要安装依赖或生成图片；尽量在一次实现加自检内完成。",
+  "schedule": {
+    "baseline": [
+      "sharing",
+      "honesty",
+      "help",
+      "help-repeat"
+    ],
+    "round1": [
+      "sharing",
+      "honesty"
+    ],
+    "round2": [
+      "sharing",
+      "honesty",
+      "help",
+      "help-repeat"
+    ]
+  },
+  "iteration": "Baseline and round1 development feedback can inform the next focused change. Keep transfer-case scoring sealed until round2 is frozen. Repeats are scheduled in their respective version blocks to avoid needless redeployments; version order is not randomized.",
+  "change_scope": "Only profiles/frontend/skills/offline-learning-card/SKILL.md is the experimental behavior variable. The observed generated Skill is versioned unchanged in the setup baseline. No control-plane feature development or new runtime.",
+  "grading": {
+    "dimensions": [
+      "teaching correctness",
+      "Chinese readability for age 6-8",
+      "story and feedback consistency",
+      "questions test understanding and transfer"
+    ],
+    "scale": {
+      "0": "absent or seriously wrong",
+      "1": "major defects",
+      "2": "usable only after meaningful correction",
+      "3": "meets goal with minor flaws",
+      "4": "clear, precise, and effective in this artifact"
+    },
+    "pass": "Each dimension >=3 and no hard fail; deterministic browser and artifact checks also pass.",
+    "hard_fail": [
+      "unsafe behavior promoted",
+      "incorrect teaching",
+      "missing required artifact",
+      "broken interaction"
+    ],
+    "method": "Two independent model judges, same available model family, opaque artifact labels, different presentation orders, visible page text and all feedback plus browser evidence; no version, hypothesis, revision, or runtime-cost metadata.",
+    "retain_rule": "Retain round2 only if all its samples pass deterministic and semantic gates for both judges, each judge sees development mean at least 1/16 above baseline, and transfer mean (two samples per version) and minimum per-dimension score do not regress. Otherwise restore baseline. Report judge disagreement and all failures; no selecting the best sample.",
+    "inference_limit": "Practical pilot decision threshold, not statistical significance, real child learning efficacy, or proof of general reliability."
+  },
+  "budget": {
+    "planned_runs": 10,
+    "max_run_seconds": 300,
+    "no_progress_seconds": 120,
+    "image_calls": 0,
+    "infrastructure_retries": "Reuse idempotency keys; never replace a failed sample with a better one. One corrected protocol rerun is allowed only when the trial is technically invalid, with both preserved."
+  },
+  "evidence": [
+    "source commit",
+    "effective SOUL/Skills/config/memory fingerprints before and after each run",
+    "new run/session id",
+    "actual model",
+    "partial SSE",
+    "result and artifact downloads with SHA256",
+    "browser checks",
+    "opaque judge inputs and raw scores"
+  ],
+  "state_control": "For this controlled pilot, disable auxiliary.background_review.enabled only for frontend via native Hermes config CLI using session-authorized development SSH, and restore its original behavior after the experiment. Record the fixed effective config and all SOUL/Skill/memory fingerprints before/after each run; verify Skill loading in trace. No global setting or source-code hotpatch. Deployment and task/result loop remain through existing HTTP APIs."
+}
