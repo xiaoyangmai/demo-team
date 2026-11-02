@@ -1,9 +1,0 @@
-# Repair while retaining useful behavior
-
-Before editing, identify the concrete defect from the supplied feedback and verify it against the artifact. Record the decisions and constraints that already work: the learning principle, the unshown application and its decisive condition, a credible partial option, concise choices, factual support, and unaffected content/UI. Do not preserve a property merely because the producer claimed it.
-
-Choose the smallest semantic repair that satisfies both the defect and those retained properties. A missing prerequisite is different from the action being assessed: put an already-completed prerequisite in the question's premise when appropriate, leaving the child to make the intended decision. Replacing that decision with the prerequisite can turn an application into recall. If the intended decision itself is invalid, redesign that item rather than preserving it blindly. Do not fix a missing step by stuffing the whole routine into the correct option.
-
-Preserve the original lesson. Before applying the change, state what will change, why that repairs the defect, and what must remain true. Afterward compare before and after by meaning as well as changed fields: is the new answer already enacted in the story, does a plausible partial option still require the principle, are needed facts explicit, and did readability/feedback or an unrelated item change? Read every changed field and its dependents. A string-absence check or an always-true assertion cannot establish these properties.
-
-Apply one bounded repair. Update the HTML from the same lesson object and run the normal delivery checks. Record actual evidence and any unresolved limitation. If no justified repair fits the budget, retain the original draft and report the unresolved issue; do not label it accepted. Independent artifact evaluation belongs to the caller.
