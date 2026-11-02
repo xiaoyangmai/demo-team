@@ -1,8 +1,10 @@
-from harness.dspy_project import decide, environment_report, DIMENSIONS
+import json
+from harness.dspy_project import decide, environment_report, trace_summary, DIMENSIONS
 
 
 def grade(scores, passed=True):
-    return {"score": 0.6 * min(scores) / 4 + 0.4 * sum(scores) / (4 * len(scores)), "passed": passed,
+    value = 0.6 * min(scores) / 4 + 0.4 * sum(scores) / (4 * len(scores))
+    return {"score": value, 'quality_score': value, "passed": passed,
             "dimensions": dict(zip(DIMENSIONS, scores))}
 
 
@@ -24,3 +26,22 @@ def test_failed_candidate_and_equal_score_are_not_promoted():
 def test_environment_contract_matches_control_plane():
     details = {"ready": True, "revision": "sha", "files": {"SOUL.md": "hash"}}
     assert environment_report({"ready": True, "check": {"ready": True, "details": details}}) == details
+
+
+def test_budget_compliance_alone_is_not_an_artifact_quality_gain():
+    baseline = grade([3]*6, False)
+    baseline['score'] = 0
+    decision = decide({'baseline': [baseline], 'candidate': [grade([3]*6)]})
+    assert decision['mean_gain'] > 0 and decision['quality_mean_gain'] == 0
+    assert not decision['adopt']
+
+
+def test_image_budget_counts_native_and_deferred_calls_not_rejected_batches():
+    def call(name, args):
+        return {'function': {'name': name, 'arguments': json.dumps(args)}}
+    image = {'name': 'image_generate', 'arguments': {'prompt': 'page'}}
+    rows = [{'tool_calls': [call('image_generate', {'prompt':'page'}),
+                          call('tool_call', {'calls':[image]}),
+                          call('tool_call', {'calls':[image,image]}),
+                          call('vision_analyze', {'image_url':'page.jpg'})]}]
+    assert trace_summary(rows)['image_generation_attempts'] == 2

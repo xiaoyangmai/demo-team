@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import dspy
@@ -15,6 +16,7 @@ PROFILES = ('architect', 'backend', 'frontend', 'reviewer')
 SKILL = 'profiles/frontend/skills/illustrated-comic-delivery/SKILL.md'
 DIMENSIONS = ('teaching', 'readability', 'visual_story', 'consistency', 'assessment', 'closure')
 POLICY = {'max_metric_calls': 6, 'max_remote_runs': 16, 'run_timeout_seconds': 900,
+          'image_generation_limit': 5,
           'minimum_gain': 0.03, 'dimension_floor': 3, 'judge_count': 2,
           'score': '0.6 * minimum dimension / 4 + 0.4 * mean dimension / 4'}
 JUDGE_FOCUS = ('Trace the cause, choice and consequence in each pictured panel, then inspect questions and ending.',
@@ -49,11 +51,21 @@ def task(case, delivery, revision):
 
 def trace_summary(rows):
     calls = []
+    image_attempts = 0
     for row in rows:
         for call in row.get('tool_calls') or []:
             f = call.get('function', call)
             calls.append({'name': f.get('name'), 'arguments': str(f.get('arguments', ''))[:1500]})
-    return {'tool_calls': calls, 'messages': len(rows)}
+            if f.get('name') == 'image_generate':
+                image_attempts += 1
+            elif f.get('name') == 'tool_call':
+                arguments = f['arguments']
+                batch = json.loads(arguments) if isinstance(arguments, str) else arguments
+                entries = batch['calls']
+                # Hermes 0.21.4 rejects multi-entry local batches before execution.
+                if len(entries) == 1 and entries[0]['name'] == 'image_generate':
+                    image_attempts += 1
+    return {'tool_calls': calls, 'messages': len(rows), 'image_generation_attempts': image_attempts}
 
 
 def verify_trace(summary):
@@ -210,20 +222,27 @@ def inspect_artifact(folder):
 
 
 def grade(folder, case, judge_lm):
+    usage = trace_summary(json.loads((folder / 'trace.json').read_text(encoding='utf-8')))
+    image_attempts = usage['image_generation_attempts']
     try:
         lesson, paths, checks = inspect_artifact(folder)
     except (AssertionError, KeyError, ValueError, OSError, BrowserTimeout) as exc:
-        return {'score': 0.0, 'passed': False, 'dimensions': {}, 'deterministic': False,
+        return {'score': 0.0, 'quality_score': 0.0, 'passed': False, 'dimensions': {}, 'deterministic': False,
+                'image_generation_attempts': image_attempts,
                 'feedback': 'Artifact contract failed: ' + str(exc)}
     pictures = [dspy.Image(str(p)) for p in paths]
     ui = [dspy.Image(str(folder / n)) for n in ('page-390-1.png', 'quiz-390.png', 'complete-390.png')]
     grades = []
     with dspy.context(lm=judge_lm, adapter=dspy.JSONAdapter()):
         reader = dspy.Predict(ReadComic)(pictures=pictures, captions=[p['caption'] for p in lesson['pages']])
-        for focus in JUDGE_FOCUS:
-            a = dspy.Predict(Assess)(task_goal=case['topic'],
+    def assess(focus):
+        with dspy.context(lm=judge_lm, adapter=dspy.JSONAdapter()):
+            return dspy.Predict(Assess)(task_goal=case['topic'],
                 artifact=json.dumps({'lesson': lesson, 'checks': checks}, ensure_ascii=False),
                 pictures=pictures + ui, reader_observations=reader.observations, assessment_focus=focus)
+    # Independent contexts perform independent network calls; no extra judge or retries.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        for a in pool.map(assess, JUDGE_FOCUS):
             dims = {name: getattr(a, name) for name in DIMENSIONS}
             if any(type(v) is not int or not 0 <= v <= 4 for v in dims.values()):
                 raise ValueError('Judge returned a score outside the frozen rubric')
@@ -238,9 +257,14 @@ def grade(folder, case, judge_lm):
     if any(c['conspicuous_length_cue'] for c in checks['answer_cues']):
         dimensions['assessment'] = min(2, dimensions['assessment'])
         violations.append('A correct choice has a conspicuous length cue')
+    budget_passed = image_attempts <= POLICY['image_generation_limit']
+    if not budget_passed:
+        violations.append(f"Actual trace contains {image_attempts} image generation attempts; limit is {POLICY['image_generation_limit']}. Bounded repair is part of acceptance.")
     hard_fail = any(g['hard_fail'] for g in grades)
-    score = 0.0 if hard_fail else 0.6 * min(dimensions.values()) / 4 + 0.4 * sum(dimensions.values()) / (4 * len(DIMENSIONS))
-    return {'score': score, 'passed': not hard_fail and min(dimensions.values()) >= POLICY['dimension_floor'],
+    quality_score = 0.0 if hard_fail else 0.6 * min(dimensions.values()) / 4 + 0.4 * sum(dimensions.values()) / (4 * len(DIMENSIONS))
+    return {'score': quality_score if budget_passed else 0.0, 'quality_score': quality_score,
+            'passed': budget_passed and not hard_fail and min(dimensions.values()) >= POLICY['dimension_floor'],
+            'image_generation_attempts': image_attempts, 'budget_passed': budget_passed,
             'deterministic': True, 'dimensions': dimensions, 'judges': grades, 'browser_checks': checks,
             'reader_observations': reader.observations,
             'feedback': '\n'.join(violations + [reader.observations] + [g['evidence'] for g in grades])}
@@ -249,9 +273,10 @@ def grade(folder, case, judge_lm):
 def decide(comparison):
     baseline, candidate = comparison['baseline'], comparison['candidate']
     gain = sum(c['score'] - b['score'] for b, c in zip(baseline, candidate)) / len(baseline)
+    quality_gain = sum(c['quality_score'] - b['quality_score'] for b, c in zip(baseline, candidate)) / len(baseline)
     regressions = [i for i, (b, c) in enumerate(zip(baseline, candidate))
                    if any(c['dimensions'].get(k, 0) < value for k, value in b['dimensions'].items())]
-    return {'adopt': all(g['passed'] for g in candidate) and not regressions and gain >= POLICY['minimum_gain'],
-            'mean_gain': gain, 'regressed_cases': regressions,
+    return {'adopt': all(g['passed'] for g in candidate) and not regressions and min(gain, quality_gain) >= POLICY['minimum_gain'],
+            'mean_gain': gain, 'quality_mean_gain': quality_gain, 'regressed_cases': regressions,
             'rule': 'Both graders meet every product floor; no paired dimensional regression; bottleneck-aware gain >= minimum.',
             'claim_limit': 'Automatic artifact-quality proxy; real child learning and market demand are not measured.'}
