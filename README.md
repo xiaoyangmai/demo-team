@@ -1,6 +1,6 @@
 # demo-team
 
-这是一个 Hermes 多 profile 团队项目模板。
+这是一个使用 Hermes 执行、DSPy + GEPA 优化真实 Skill 的多 profile 项目。
 
 ```text
 Git 项目:    demo-team
@@ -37,6 +37,31 @@ demo-team/
 
 项目注册时提交仓库地址和 `project_id: demo-team`。控制服务负责创建或确认同名 Hermes project、Kanban board 和项目工作区；profile distribution 作为仓库中的角色定义分别维护。
 
-frontend 的 `config.yaml` 禁用 `code_execution` 工具集，保留普通文件和终端工具。当前部署在无人值守模式下会拒绝 `execute_code`，因此不向模型暴露这个不可用入口。
+## 所有权
 
-已有 profile 的 `config.yaml` 会被原生 distribution update 保留，普通 `gateway/refresh` 不会覆盖它。发布这个设置时，先提交并同步 Git，再在已授权的部署管理步骤中执行一次 `hermes --profile frontend config set agent.disabled_toolsets '["code_execution"]'`，随后执行现有 `gateway/refresh`。验收 `/p/frontend/v1/toolsets` 中 `code_execution.enabled=false`、其他工具集未变，以及新会话的实际交付。不要用关闭审批或整体覆盖配置来代替这项迁移。
+- `profiles/` 是 Hermes 原生角色、distribution、Skill 的发布源。当前优化目标是 frontend 的 `offline-learning-card/SKILL.md` 正文；其余资源冻结。
+- `harness/dspy_project.py` 定义任务协议、远端取证要求、浏览器检查、独立模型评分和采纳规则。它不生成候选，不实现搜索算法。
+- [Self-Evolution fork](https://github.com/xiaoyangmai/hermes-agent-self-evolution) 的 `hermes-evolve` 使用 DSPy GEPA 生成候选，并把优化后的 `Predict.signature.instructions` 原样写入实际 Skill，提交、推送、发布、运行和收集证据。
+- LLMHub control-plane 只做 Git 接入/同步、环境准备、profile 发布、运行结果与产物登记下载。任务执行属于 Hermes Gateway；评分和采纳属于 Self-Evolution 与本项目的评估协议。
+
+## 环境和运行
+
+本地安装 Self-Evolution 的 `.[browser]` 依赖，使用 Python 3.11+、Git 和 Edge。`harness/dspy_project.py` 使用真实浏览器测试离线页面，不在生产 Hermes 容器里安装浏览器。凭据通过环境变量提供，见引擎 README。
+
+远端 `ops/check-environment` 返回实际 Git revision、frontend 已安装文件的 SHA-256 和配置检查。`ops/install-environment` 只通过原生 Hermes CLI 关闭后台 Skill 自修改以及无人值守环境不支持的 `code_execution`。普通 distribution update 保留 config.yaml，因此这些设置由受控 prepare 明确应用。四个 profile 共享 Gateway，实验串行执行，刷新前检查全部角色无活跃任务。
+
+在仓库外创建私有 cases.json，包含非空 `train`、`validation`、`test` 列表，每项为 `{ "id": "唯一标识", "topic": "教学目标与场景" }`。重复测量用不同 id。训练/验证供 GEPA 搜索，test 只用于最后一次采纳比较；不要把私有验收案例提交到生产仓库。
+
+```powershell
+hermes-evolve --repo D:\demo-team --dataset D:\experiments\cases.json --output D:\experiments\run-001
+```
+
+先提交项目修改。引擎有意对候选产生普通 Git 提交并推送；当前版本的 control-plane 同步注册仓库的远端 HEAD，不接受任意 revision，因此运行期间不要并发推送或编辑这个项目。复用同一个 output 可恢复同一冻结实验；改案例、评估器、模型或预算要使用新目录。
+
+## 评估与结束
+
+产物是可离线打开的儿童学习页及 lesson.json。自动检查两种宽度下的 12 次选项交互、重试、锁定、重置和页面/JSON 一致性；两个独立模型调用按教学正确性、可读性、一致性、迁移理解评分，读取真实内容而不读取候选指令或生产者自评。
+
+采纳要求所有留出用例通过、每个用例各维度均不退步、平均分至少提升 0.03。未达到则恢复基线并验证实际生效；拒绝候选也是有效实验结果，不能宣传为质量提升。同模型的两个评估调用仍可能存在相关偏差，分数只代表冻结的产物质量代理，不能证明真实儿童学习效果。
+
+每次实验保留编译后的 `program.json`、候选 Skill、GEPA 搜索状态、Git/部署回执、Skill 加载轨迹、下载文件及校验值、浏览器截图、独立评分、采纳决定和最终发布回执。实验产物与私有用例放仓库外。以前人工规定轮次的配置已由此流程替代。

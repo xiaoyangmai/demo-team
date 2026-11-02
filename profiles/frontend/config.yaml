@@ -2,3 +2,6 @@
 agent:
   disabled_toolsets:
     - code_execution
+auxiliary:
+  background_review:
+    enabled: false

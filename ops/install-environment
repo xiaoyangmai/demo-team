@@ -1,0 +1,9 @@
+#!/bin/sh
+export HERMES_HOME=/opt/data
+exec python3 - <<'PY'
+"""Apply the profile's declared unattended execution configuration."""
+import subprocess
+
+subprocess.run(['hermes', '--profile', 'frontend', 'config', 'set', 'auxiliary.background_review.enabled', 'false'], check=True)
+subprocess.run(['hermes', '--profile', 'frontend', 'config', 'set', 'agent.disabled_toolsets', '["code_execution"]'], check=True)
+PY
