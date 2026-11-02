@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image
 import pytest
 
-from harness.dspy_project import inspect_artifact
+from harness.dspy_project import grade, inspect_artifact
 
 
 @pytest.fixture
@@ -50,3 +50,14 @@ def test_repeated_or_missing_illustrations_are_rejected(comic):
     target.unlink()
     with pytest.raises(FileNotFoundError):
         inspect_artifact(folder)
+
+
+def test_incomplete_comic_returns_actionable_feedback_without_model_grading(comic):
+    folder, lesson = comic
+    lesson['pages'] = lesson['pages'][:2]
+    (folder / 'artifacts/lesson.json').write_text(json.dumps(lesson), encoding='utf-8')
+    (folder / 'trace.json').write_text('[]', encoding='utf-8')
+    result = grade(folder, {'topic': '观察'}, None)
+    assert result['score'] == 0 and not result['deterministic']
+    assert result['dimensions'] == {}
+    assert 'Expected 4 illustrated pages; found 2' in result['feedback']

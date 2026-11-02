@@ -148,7 +148,7 @@ def inspect_artifact(folder):
     root = folder / 'artifacts'
     lesson = json.loads((root / 'lesson.json').read_text(encoding='utf-8'))
     assert lesson['title'] and lesson['learning_goal'] and lesson['takeaway'] and lesson['practice']
-    assert len(lesson['pages']) == 4
+    assert len(lesson['pages']) == 4, f"Expected 4 illustrated pages; found {len(lesson['pages'])}"
     pictures, hashes = [], []
     for n, item in enumerate(lesson['pages'], 1):
         filename = Path(item['image'])
