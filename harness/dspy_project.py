@@ -43,7 +43,7 @@ def task(case, delivery, revision):
         '使用已配置的图像工具和视觉工具，不另建客户端、不换账号。图片可能返回URL或本地路径，保存实际返回的图片字节。'
         f'调用 python3 profiles/frontend/skills/illustrated-comic-delivery/scripts/render.py .harness/results/{delivery} 生成HTML和manifest。'
         f'另写result.json，字段profile="{PROFILE}"、delivery_id="{delivery}"、source_revision=实际Git HEAD、summary、实际执行的checks。'
-        '不要自行finalize，不声称未执行的浏览器验证。'
+        '远端验证图片、JSON和交付文件即可；完整浏览器交互由独立评估器执行，不必重复打开远端浏览器。不要自行finalize，不声称未执行的浏览器验证。'
     }
 
 
@@ -144,6 +144,7 @@ def inspect_artifact(folder):
         path = root / filename
         with Image.open(path) as img:
             assert img.format in ('JPEG', 'PNG', 'WEBP') and min(img.size) >= 512
+            assert filename.suffix.lower() in {'JPEG': ('.jpg', '.jpeg'), 'PNG': ('.png',), 'WEBP': ('.webp',)}[img.format], 'Image extension differs from actual format'
             img.load()
         assert item['caption'] and item['alt']
         pictures.append(path)
