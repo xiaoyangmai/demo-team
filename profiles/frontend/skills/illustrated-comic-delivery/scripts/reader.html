@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小小发现家</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f2e9;color:#263b38;font-family:system-ui,"Microsoft YaHei",sans-serif;font-size:18px;line-height:1.65}
+main{max-width:880px;margin:auto;padding:22px 24px 48px}header{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #cbd3c8;padding-bottom:12px}
+.brand{font-size:13px;letter-spacing:3px;font-weight:700}.badge{font-size:13px;background:#e7eacb;padding:4px 12px;border-radius:16px}
+h1{font-size:clamp(25px,4vw,40px);line-height:1.25;margin:26px 0 12px}h2{font-size:25px;line-height:1.4}.muted{color:#596963;font-size:15px}
+figure{margin:0}figure img{width:100%;max-height:650px;object-fit:contain;display:block;background:white;border-radius:14px;border:1px solid #d3d6c7}
+figcaption{font-size:21px;line-height:1.75;padding:14px 0;max-width:36em}.nav{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 0}
+button{font:inherit;line-height:1.5;border:1px solid #acb9ad;border-radius:12px;padding:12px 20px;cursor:pointer;background:#fffefa;color:inherit;min-height:48px}
+button.primary{background:#28635b;color:white;border-color:#28635b}button:hover:enabled{box-shadow:0 3px 0 #d5d9c5}button:focus-visible{outline:3px solid #d88a23;outline-offset:3px}button:disabled{cursor:default;opacity:.65}
+.question{margin:20px 0;padding:22px;background:#fffefa;border:1px solid #d5d9c9;border-radius:16px}.options{display:grid;gap:10px}.options button{text-align:left;width:100%}
+.options button.correct{background:#e0eedf;border-color:#467552;opacity:1}.options button.wrong{background:#fff0d3}
+[data-feedback]{min-height:1.5em;margin:12px 0 0;font-size:17px}.finish{background:#e6eddf;border-radius:16px;padding:24px;margin:24px 0}.finish h2{margin-top:0}.finish p{margin-bottom:12px}
+[hidden]{display:none!important}footer{border-top:1px solid #cbd3c8;margin-top:25px;padding-top:14px;font-size:14px;color:#596963}
+@media(max-width:520px){main{padding:14px 16px 32px}h1{margin-top:20px}figcaption{font-size:19px}.question{padding:16px}button{padding:11px 14px}}
+</style>
+<main>
+<header><span class="brand">小小发现家</span><span class="badge">6–8 岁 · 亲子共读</span></header>
+<h1 id="title"></h1>
+<section id="comic" aria-label="四页漫画">
+<p class="muted" id="progress" aria-live="polite"></p>
+<figure><img id="art" alt=""><figcaption id="caption"></figcaption></figure>
+<nav class="nav" aria-label="阅读翻页"><button id="previous">上一页</button><button class="primary" id="next">下一页</button></nav>
+</section>
+<section id="quiz" hidden><h2>换个情境，你会怎么做？</h2><div id="questions"></div><button id="back">再看看漫画</button></section>
+<section id="completion" class="finish" hidden aria-live="polite"><h2>把发现带回生活</h2><p id="takeaway"></p><strong>今天试一试</strong><p id="practice"></p></section>
+<footer><button id="reset">从头再读</button><p>可离线阅读 · 故事里的小尝试，可和家人一起做</p></footer>
+</main>
+<script>
+const lesson=__LESSON_DATA__;
+const $=id=>document.getElementById(id);
+let current=0;
+const solved=new Set();
+$('title').textContent=lesson.title;document.title=lesson.title;
+$('takeaway').textContent=lesson.takeaway;$('practice').textContent=lesson.practice;
+function showPage(){const p=lesson.pages[current];$('art').src=p.image;$('art').alt=p.alt;$('caption').textContent=p.caption;$('progress').textContent=`第 ${current+1} / 4 页`;$('previous').disabled=current===0;$('next').textContent=current===3?'来试两道题':'下一页';$('comic').hidden=false;$('quiz').hidden=true;$('completion').hidden=true;}
+function showQuiz(){$('comic').hidden=true;$('quiz').hidden=false;$('completion').hidden=solved.size!==2;window.scrollTo(0,0);}
+for(const q of lesson.questions){const group=document.createElement('section');group.className='question';group.dataset.question=q.id;const prompt=document.createElement('h2');prompt.textContent=q.prompt;group.append(prompt);const options=document.createElement('div');options.className='options';const feedback=document.createElement('p');feedback.dataset.feedback='';feedback.setAttribute('aria-live','polite');
+for(const o of q.options){const b=document.createElement('button');b.dataset.option=o.id;b.textContent=o.text;b.onclick=()=>{feedback.textContent=o.feedback;for(const s of options.children)s.classList.remove('wrong');if(o.id===q.answer){b.classList.add('correct');for(const s of options.children)s.disabled=true;solved.add(q.id);$('completion').hidden=solved.size!==2;}else{b.classList.add('wrong');}};options.append(b);}group.append(options,feedback);$('questions').append(group);}
+$('previous').onclick=()=>{current--;showPage();};$('next').onclick=()=>{if(current===3)showQuiz();else{current++;showPage();window.scrollTo(0,0);}};$('back').onclick=()=>{current=0;showPage();window.scrollTo(0,0);};
+$('reset').onclick=()=>{solved.clear();for(const b of document.querySelectorAll('[data-option]')){b.disabled=false;b.classList.remove('correct','wrong');}for(const f of document.querySelectorAll('[data-feedback]'))f.textContent='';current=0;showPage();window.scrollTo(0,0);};showPage();
+</script>
+</html>
