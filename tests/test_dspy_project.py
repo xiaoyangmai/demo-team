@@ -71,7 +71,7 @@ def test_task_uses_experiment_workspace():
 
 def test_visual_calibration_checks_both_real_judges_and_failure_blocks(monkeypatch):
     monkeypatch.setattr(project.dspy, 'context', lambda **_: nullcontext())
-    monkeypatch.setattr(project.dspy, 'Image', lambda path: path)
+    monkeypatch.setattr(project.dspy.Image, 'from_path', lambda path: path)
     calls = []
     def predict(_):
         def run(**kwargs):

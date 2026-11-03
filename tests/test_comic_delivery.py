@@ -85,7 +85,7 @@ def test_judges_observe_independently_and_budget_does_not_hide_quality(comic, mo
     checks = {'reading_lengths': {'captions': [], 'options': [], 'prompts': [], 'feedback': [], 'ending': []},
               'answer_cues': []}
     monkeypatch.setattr(project, 'inspect_artifact', lambda _: (lesson, [], checks))
-    monkeypatch.setattr(project.dspy, 'Image', lambda path: path)
+    monkeypatch.setattr(project.dspy.Image, 'from_path', lambda path: path)
     monkeypatch.setattr(project.dspy, 'context', lambda **_: nullcontext())
     calls = []
     def predict(signature):

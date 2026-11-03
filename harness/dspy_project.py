@@ -135,7 +135,7 @@ def calibrate(judge_lm):
                 score = getattr(a, dimension)
                 records.append({'control': name, 'dimension': dimension, 'score': score,
                                 'passed': (score >= 3) == expected, 'evidence': a.evidence})
-        image = dspy.Image(str(Path(__file__).resolve().parents[1] / 'evals/calibration/bridge.jpg'))
+        image = dspy.Image.from_path(str(Path(__file__).resolve().parents[1] / 'evals/calibration/bridge.jpg'))
         visual_controls = [
             ('ordinary_transition', True, '女孩先拿着杯子，后来杯子放在桥上，积木整齐地放在旁边。'),
             ('contradictory_state', False, '两个画格里，杯子一直拿在女孩手上，积木一直在纸桥中间。'),
@@ -263,8 +263,8 @@ def grade(folder, case, judge_lm):
         return {'score': 0.0, 'quality_score': 0.0, 'passed': False, 'dimensions': {}, 'deterministic': False,
                 'image_generation_attempts': image_attempts,
                 'feedback': 'Artifact contract failed: ' + str(exc)}
-    pictures = [dspy.Image(str(p)) for p in paths]
-    ui = [dspy.Image(str(folder / n)) for n in
+    pictures = [dspy.Image.from_path(str(p)) for p in paths]
+    ui = [dspy.Image.from_path(str(folder / n)) for n in
           ('page-390-1.png', 'page-390-2.png', 'page-390-3.png', 'page-390-4.png', 'quiz-390.png', 'complete-390.png')]
     grades = []
     def assess(focus):
