@@ -55,7 +55,9 @@ def trace_summary(rows):
     for row in rows:
         for call in row.get('tool_calls') or []:
             f = call.get('function', call)
-            calls.append({'name': f.get('name'), 'arguments': str(f.get('arguments', ''))[:1500]})
+            excerpt = str(f.get('arguments', ''))
+            calls.append({'name': f.get('name'), 'arguments': excerpt[:1500],
+                          'arguments_truncated': len(excerpt) > 1500})
             if f.get('name') == 'image_generate':
                 image_attempts += 1
             elif f.get('name') == 'tool_call':

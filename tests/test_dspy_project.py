@@ -39,9 +39,12 @@ def test_budget_compliance_alone_is_not_an_artifact_quality_gain():
 def test_image_budget_counts_native_and_deferred_calls_not_rejected_batches():
     def call(name, args):
         return {'function': {'name': name, 'arguments': json.dumps(args)}}
-    image = {'name': 'image_generate', 'arguments': {'prompt': 'page'}}
+    image = {'name': 'image_generate', 'arguments': {'prompt': 'page ' * 400}}
     rows = [{'tool_calls': [call('image_generate', {'prompt':'page'}),
                           call('tool_call', {'calls':[image]}),
                           call('tool_call', {'calls':[image,image]}),
                           call('vision_analyze', {'image_url':'page.jpg'})]}]
-    assert trace_summary(rows)['image_generation_attempts'] == 2
+    summary = trace_summary(rows)
+    assert summary['image_generation_attempts'] == 2
+    assert [c['arguments_truncated'] for c in summary['tool_calls']] == [False, True, True, False]
+    assert len(summary['tool_calls'][1]['arguments']) == 1500
