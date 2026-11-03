@@ -10,13 +10,19 @@ import yaml
 
 root = Path(os.environ['HERMES_HOME']) / 'profiles/frontend'
 config = yaml.safe_load((root / 'config.yaml').read_text())
+os.environ['HERMES_HOME'] = str(root)
+from agent.curator import is_enabled
+
+curator_disabled = config.get('curator', {}).get('enabled', True) is False and not is_enabled()
 files = [root / 'SOUL.md', root / 'config.yaml']
-files += sorted(p for p in (root / 'skills').rglob('*') if p.is_file() and p.name != '.usage.json' and not p.is_symlink())
+files += sorted(p for p in (root / 'skills').rglob('*') if p.is_file() and p.name != '.usage.json'
+                and not (curator_disabled and p == root / 'skills/.curator_state') and not p.is_symlink())
 files += sorted(p for p in (root / 'memories').rglob('*') if p.is_file() and not p.is_symlink())
 checks = {'background_review_disabled': config.get('auxiliary', {}).get('background_review', {}).get('enabled', True) is False,
-          'curator_disabled': config.get('curator', {}).get('enabled', True) is False,
+          'curator_disabled': curator_disabled,
           'code_execution_disabled': 'code_execution' in config.get('agent', {}).get('disabled_toolsets', [])}
 print(json.dumps({'ready': all(checks.values()), 'checks': checks,
+                  'curator_disabled_profiles': ['frontend'],
                   'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
                   'files': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()}}))
 PY
