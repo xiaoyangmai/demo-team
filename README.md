@@ -48,7 +48,7 @@ demo-team/
 
 本地安装本项目 `pyproject.toml` 声明的依赖（含 Pillow），使用 Python 3.11+、Git 和 Edge。`harness/dspy_project.py` 使用真实浏览器测试离线页面，不在生产 Hermes 容器里安装浏览器。远端使用已配置的 `image_generate` 和 `vision_analyze`。凭据通过环境变量提供，见引擎 README。
 
-远端 `ops/check-environment` 返回实际 Git revision、frontend 已安装文件的 SHA-256 和配置检查。`ops/install-environment` 只通过原生 Hermes CLI 关闭后台 Skill 自修改以及无人值守环境不支持的 `code_execution`；两个脚本使用受控运行环境提供的 `HERMES_HOME`。普通 distribution update 保留 config.yaml，因此这些设置由受控 prepare 明确应用。实验使用独立 Hermes home、checkout 与 Gateway；生产任务总并发不超过四个，运行期间不切换所在实例的候选。
+远端 `ops/check-environment` 返回实际 Git revision、frontend 已安装文件的 SHA-256 和配置检查。`ops/install-environment` 通过原生 Hermes CLI 关闭后台 Skill review、默认开启的 curator，以及无人值守环境不支持的 `code_execution`；两个脚本使用受控运行环境提供的 `HERMES_HOME`。普通 distribution update 保留 config.yaml，因此这些设置由受控 prepare 明确应用，检查会在 curator 未明确关闭时拒绝就绪。实验使用独立 Hermes home、checkout 与 Gateway；生产任务总并发不超过四个，运行期间不切换所在实例的候选。
 
 在仓库外创建私有 cases.json，包含非空 `train`、`validation`、`test` 列表，每项为 `{ "id": "唯一标识", "topic": "教学目标与场景" }`。重复测量用不同 id。训练/验证供 GEPA 搜索，test 只用于最后一次采纳比较；不要把私有验收案例提交到生产仓库。
 

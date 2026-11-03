@@ -14,6 +14,7 @@ files = [root / 'SOUL.md', root / 'config.yaml']
 files += sorted(p for p in (root / 'skills').rglob('*') if p.is_file() and p.name != '.usage.json' and not p.is_symlink())
 files += sorted(p for p in (root / 'memories').rglob('*') if p.is_file() and not p.is_symlink())
 checks = {'background_review_disabled': config.get('auxiliary', {}).get('background_review', {}).get('enabled', True) is False,
+          'curator_disabled': config.get('curator', {}).get('enabled', True) is False,
           'code_execution_disabled': 'code_execution' in config.get('agent', {}).get('disabled_toolsets', [])}
 print(json.dumps({'ready': all(checks.values()), 'checks': checks,
                   'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),

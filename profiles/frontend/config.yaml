@@ -5,3 +5,5 @@ agent:
 auxiliary:
   background_review:
     enabled: false
+curator:
+  enabled: false

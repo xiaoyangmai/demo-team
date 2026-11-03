@@ -4,5 +4,6 @@ exec python3 - <<'PY'
 import subprocess
 
 subprocess.run(['hermes', '--profile', 'frontend', 'config', 'set', 'auxiliary.background_review.enabled', 'false'], check=True)
+subprocess.run(['hermes', '--profile', 'frontend', 'config', 'set', 'curator.enabled', 'false'], check=True)
 subprocess.run(['hermes', '--profile', 'frontend', 'config', 'set', 'agent.disabled_toolsets', '["code_execution"]'], check=True)
 PY
