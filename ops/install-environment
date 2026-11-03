@@ -1,5 +1,4 @@
 #!/bin/sh
-export HERMES_HOME=/opt/data
 exec python3 - <<'PY'
 """Apply the profile's declared unattended execution configuration."""
 import subprocess

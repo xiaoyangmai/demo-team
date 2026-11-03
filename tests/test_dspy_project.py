@@ -1,10 +1,15 @@
 import json
-from harness.dspy_project import decide, environment_report, trace_summary, DIMENSIONS
+from contextlib import nullcontext
+from types import SimpleNamespace
+
+import harness.dspy_project as project
+import pytest
+from harness.dspy_project import decide, environment_report, task, trace_summary, DIMENSIONS
 
 
 def grade(scores, passed=True):
     value = 0.6 * min(scores) / 4 + 0.4 * sum(scores) / (4 * len(scores))
-    return {"score": value, 'quality_score': value, "passed": passed,
+    return {"case_id": "case", "score": value, 'quality_score': value, "passed": passed,
             "dimensions": dict(zip(DIMENSIONS, scores))}
 
 
@@ -36,6 +41,15 @@ def test_budget_compliance_alone_is_not_an_artifact_quality_gain():
     assert not decision['adopt']
 
 
+def test_incomplete_or_mismatched_comparison_cannot_be_adopted():
+    a, b = grade([3]*6), grade([4]*6)
+    with pytest.raises(ValueError, match='complete and paired'):
+        decide({'baseline': [a, a], 'candidate': [b]})
+    b['case_id'] = 'different'
+    with pytest.raises(ValueError, match='complete and paired'):
+        decide({'baseline': [a], 'candidate': [b]})
+
+
 def test_image_budget_counts_native_and_deferred_calls_not_rejected_batches():
     def call(name, args):
         return {'function': {'name': name, 'arguments': json.dumps(args)}}
@@ -48,3 +62,25 @@ def test_image_budget_counts_native_and_deferred_calls_not_rejected_batches():
     assert summary['image_generation_attempts'] == 2
     assert [c['arguments_truncated'] for c in summary['tool_calls']] == [False, True, True, False]
     assert len(summary['tool_calls'][1]['arguments']) == 1500
+
+
+def test_task_uses_experiment_workspace():
+    request = task({'topic': '分类'}, 'sample', 'abc', '/opt/data/experiments/a/projects/demo-team')
+    assert '/opt/data/experiments/a/projects/demo-team' in request['instructions']
+
+
+def test_visual_calibration_checks_both_real_judges_and_failure_blocks(monkeypatch):
+    monkeypatch.setattr(project.dspy, 'context', lambda **_: nullcontext())
+    monkeypatch.setattr(project.dspy, 'Image', lambda path: path)
+    calls = []
+    def predict(_):
+        def run(**kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(**{name: 3 for name in DIMENSIONS}, hard_fail=False, observations='seen', evidence='page')
+        return run
+    monkeypatch.setattr(project.dspy, 'Predict', predict)
+    result = project.calibrate(None)
+    assert not result['passed']
+    visual = [call for call in calls if call['pictures']]
+    assert len(visual) == 14 and all(call['pictures'][0].endswith('bridge.jpg') for call in visual)
+    assert len([item for item in result['controls'] if item['control'] == 'contradictory_state' and not item['passed']]) == 2

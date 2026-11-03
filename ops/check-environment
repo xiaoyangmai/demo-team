@@ -3,11 +3,12 @@ exec python3 - <<'PY'
 """Read-only facts for Self-Evolution; never score artifacts or choose candidates."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import yaml
 
-root = Path('/opt/data/profiles/frontend')
+root = Path(os.environ['HERMES_HOME']) / 'profiles/frontend'
 config = yaml.safe_load((root / 'config.yaml').read_text())
 files = [root / 'SOUL.md', root / 'config.yaml']
 files += sorted(p for p in (root / 'skills').rglob('*') if p.is_file() and p.name != '.usage.json' and not p.is_symlink())

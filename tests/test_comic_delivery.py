@@ -1,6 +1,8 @@
 import importlib.util
 import json
+from contextlib import nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 from PIL import Image
 import pytest
@@ -52,6 +54,16 @@ def test_repeated_or_missing_illustrations_are_rejected(comic):
         inspect_artifact(folder)
 
 
+def test_reader_must_show_each_declared_page_image(comic):
+    folder, _ = comic
+    path = folder / 'artifacts/index.html'
+    html = path.read_text(encoding='utf-8')
+    assert "$('art').src=p.image" in html
+    path.write_text(html.replace("$('art').src=p.image", "$('art').src=lesson.pages[0].image"), encoding='utf-8')
+    with pytest.raises(AssertionError, match='Displayed image differs'):
+        inspect_artifact(folder)
+
+
 def test_incomplete_comic_returns_actionable_feedback_without_model_grading(comic):
     folder, lesson = comic
     lesson['pages'] = lesson['pages'][:2]
@@ -61,3 +73,37 @@ def test_incomplete_comic_returns_actionable_feedback_without_model_grading(comi
     assert result['score'] == 0 and not result['deterministic']
     assert result['dimensions'] == {}
     assert 'Expected 4 illustrated pages; found 2' in result['feedback']
+
+
+def test_judges_observe_independently_and_budget_does_not_hide_quality(comic, monkeypatch):
+    import harness.dspy_project as project
+    folder, lesson = comic
+    rows = [{'tool_calls': [{'function': {'name': 'image_generate', 'arguments': '{}'}} for _ in range(6)]}]
+    rows += [{'role': 'tool', 'tool_name': name, 'content': json.dumps({'success': True})}
+             for name in ['image_generate'] * 4 + ['vision_analyze']]
+    (folder / 'trace.json').write_text(json.dumps(rows), encoding='utf-8')
+    checks = {'reading_lengths': {'captions': [], 'options': [], 'prompts': [], 'feedback': [], 'ending': []},
+              'answer_cues': []}
+    monkeypatch.setattr(project, 'inspect_artifact', lambda _: (lesson, [], checks))
+    monkeypatch.setattr(project.dspy, 'Image', lambda path: path)
+    monkeypatch.setattr(project.dspy, 'context', lambda **_: nullcontext())
+    calls = []
+    def predict(signature):
+        assert signature is project.Assess
+        def run(**kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(**{k: 3 for k in project.DIMENSIONS}, hard_fail=False,
+                                   observations='visible observation', evidence='page evidence')
+        return run
+    monkeypatch.setattr(project.dspy, 'Predict', predict)
+    result = grade(folder, {'topic': '观察'}, None)
+    assert len(calls) == 2 and all('reader_observations' not in call for call in calls)
+    assert result['score'] == result['quality_score'] == 0.75
+    assert not result['budget_passed'] and not result['passed']
+    assert len(result['judges']) == 2 and all(j['observations'] for j in result['judges'])
+    rows[0]['tool_calls'] = rows[0]['tool_calls'][:4]
+    (folder / 'trace.json').write_text(json.dumps(rows[:-1]), encoding='utf-8')
+    result = grade(folder, {'topic': '观察'}, None)
+    assert result['budget_passed'] and not result['process_passed'] and not result['passed']
+    (folder / 'trace.json').write_text(json.dumps(rows), encoding='utf-8')
+    assert grade(folder, {'topic': '观察'}, None)['passed']
