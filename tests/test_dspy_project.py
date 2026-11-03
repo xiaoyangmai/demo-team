@@ -1,3 +1,4 @@
+import hashlib
 import json
 from contextlib import nullcontext
 from types import SimpleNamespace
@@ -67,6 +68,44 @@ def test_image_budget_counts_native_and_deferred_calls_not_rejected_batches():
 def test_task_uses_experiment_workspace():
     request = task({'topic': '分类'}, 'sample', 'abc', '/opt/data/experiments/a/projects/demo-team')
     assert '/opt/data/experiments/a/projects/demo-team' in request['instructions']
+
+
+def test_skill_trace_requires_the_successful_response_for_the_requested_body():
+    body = '# Proposed candidate\nFollow this instruction.'
+    skill = '---\nname: illustrated-comic-delivery\n---\n\n' + body
+    call = {'id': 'call-a', 'function': {'name': 'skill_view',
+            'arguments': json.dumps({'name': 'illustrated-comic-delivery'})}}
+    result = {'role': 'tool', 'tool_name': 'skill_view', 'tool_call_id': 'call-a',
+              'content': json.dumps({'success': True, 'name': 'illustrated-comic-delivery', 'content': skill})}
+    expected = hashlib.sha256(body.encode()).hexdigest()
+    rows = [{'role': 'assistant', 'tool_calls': [call]}, result]
+    project.verify_trace(trace_summary(rows), expected)
+
+    with pytest.raises(RuntimeError, match='Skill body'):
+        project.verify_trace(trace_summary(rows), hashlib.sha256(b'other candidate').hexdigest())
+    result['content'] = json.dumps({'success': False, 'name': 'illustrated-comic-delivery', 'content': skill})
+    with pytest.raises(RuntimeError, match='Skill body'):
+        project.verify_trace(trace_summary(rows))
+    result['content'] = json.dumps({'success': True, 'name': 'illustrated-comic-delivery', 'content': skill})
+    result['tool_call_id'] = 'unrelated-call'
+    with pytest.raises(RuntimeError, match='Skill body'):
+        project.verify_trace(trace_summary(rows))
+    result['tool_call_id'] = 'call-a'
+    call['function']['arguments'] = json.dumps({'name': 'illustrated-comic-delivery', 'file_path': 'scripts/render.py'})
+    with pytest.raises(RuntimeError, match='Skill body'):
+        project.verify_trace(trace_summary(rows))
+
+
+def test_grade_rejects_loaded_body_that_does_not_match_receipt(tmp_path):
+    body = '---\nname: illustrated-comic-delivery\n---\nactual body'
+    call = {'id': 'call-a', 'function': {'name': 'skill_view',
+            'arguments': json.dumps({'name': 'illustrated-comic-delivery'})}}
+    rows = [{'tool_calls': [call]}, {'role': 'tool', 'tool_name': 'skill_view', 'tool_call_id': 'call-a',
+            'content': json.dumps({'success': True, 'name': 'illustrated-comic-delivery', 'content': body})}]
+    (tmp_path / 'trace.json').write_text(json.dumps(rows), encoding='utf-8')
+    (tmp_path / 'receipt.json').write_text(json.dumps({'candidate_sha256': 'wrong'}), encoding='utf-8')
+    with pytest.raises(RuntimeError, match='Skill body'):
+        project.grade(tmp_path, {'topic': '观察'}, None)
 
 
 def test_visual_calibration_checks_both_real_judges_and_failure_blocks(monkeypatch):

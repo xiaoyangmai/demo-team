@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 from contextlib import nullcontext
 from pathlib import Path
@@ -8,6 +9,15 @@ from PIL import Image
 import pytest
 
 from harness.dspy_project import grade, inspect_artifact
+
+
+SKILL_ROWS = [
+    {'tool_calls': [{'id': 'call-skill', 'function': {'name': 'skill_view',
+        'arguments': json.dumps({'name': 'illustrated-comic-delivery'})}}]},
+    {'role': 'tool', 'tool_name': 'skill_view', 'tool_call_id': 'call-skill',
+     'content': json.dumps({'success': True, 'name': 'illustrated-comic-delivery',
+                            'content': '---\nname: illustrated-comic-delivery\n---\nbody'})},
+]
 
 
 @pytest.fixture
@@ -29,6 +39,8 @@ def comic(tmp_path):
     renderer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(renderer)
     renderer.render(folder)
+    (tmp_path / 'trace.json').write_text(json.dumps(SKILL_ROWS), encoding='utf-8')
+    (tmp_path / 'receipt.json').write_text(json.dumps({'candidate_sha256': hashlib.sha256(b'body').hexdigest()}), encoding='utf-8')
     return tmp_path, lesson
 
 
@@ -68,7 +80,6 @@ def test_incomplete_comic_returns_actionable_feedback_without_model_grading(comi
     folder, lesson = comic
     lesson['pages'] = lesson['pages'][:2]
     (folder / 'artifacts/lesson.json').write_text(json.dumps(lesson), encoding='utf-8')
-    (folder / 'trace.json').write_text('[]', encoding='utf-8')
     result = grade(folder, {'topic': '观察'}, None)
     assert result['score'] == 0 and not result['deterministic']
     assert result['dimensions'] == {}
@@ -78,7 +89,7 @@ def test_incomplete_comic_returns_actionable_feedback_without_model_grading(comi
 def test_judges_observe_independently_and_budget_does_not_hide_quality(comic, monkeypatch):
     import harness.dspy_project as project
     folder, lesson = comic
-    rows = [{'tool_calls': [{'function': {'name': 'image_generate', 'arguments': '{}'}} for _ in range(6)]}]
+    rows = SKILL_ROWS + [{'tool_calls': [{'function': {'name': 'image_generate', 'arguments': '{}'}} for _ in range(6)]}]
     rows += [{'role': 'tool', 'tool_name': name, 'content': json.dumps({'success': True})}
              for name in ['image_generate'] * 4 + ['vision_analyze']]
     (folder / 'trace.json').write_text(json.dumps(rows), encoding='utf-8')
@@ -101,7 +112,7 @@ def test_judges_observe_independently_and_budget_does_not_hide_quality(comic, mo
     assert result['score'] == result['quality_score'] == 0.75
     assert not result['budget_passed'] and not result['passed']
     assert len(result['judges']) == 2 and all(j['observations'] for j in result['judges'])
-    rows[0]['tool_calls'] = rows[0]['tool_calls'][:4]
+    rows[2]['tool_calls'] = rows[2]['tool_calls'][:4]
     (folder / 'trace.json').write_text(json.dumps(rows[:-1]), encoding='utf-8')
     result = grade(folder, {'topic': '观察'}, None)
     assert result['budget_passed'] and not result['process_passed'] and not result['passed']

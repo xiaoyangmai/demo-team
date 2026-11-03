@@ -52,6 +52,8 @@ def task(case, delivery, revision, project_home=None):
 
 def trace_summary(rows):
     calls = []
+    skill_calls = set()
+    loaded_skills = []
     image_attempts = 0
     for row in rows:
         for call in row.get('tool_calls') or []:
@@ -59,6 +61,10 @@ def trace_summary(rows):
             excerpt = str(f.get('arguments', ''))
             calls.append({'name': f.get('name'), 'arguments': excerpt[:1500],
                           'arguments_truncated': len(excerpt) > 1500})
+            if f.get('name') == 'skill_view':
+                arguments = json.loads(f['arguments']) if isinstance(f['arguments'], str) else f['arguments']
+                if arguments.get('name') == 'illustrated-comic-delivery' and not arguments.get('file_path'):
+                    skill_calls.add(call['id'])
             if f.get('name') == 'image_generate':
                 image_attempts += 1
             elif f.get('name') == 'tool_call':
@@ -68,12 +74,20 @@ def trace_summary(rows):
                 # Hermes 0.21.4 rejects multi-entry local batches before execution.
                 if len(entries) == 1 and entries[0]['name'] == 'image_generate':
                     image_attempts += 1
-    return {'tool_calls': calls, 'messages': len(rows), 'image_generation_attempts': image_attempts}
+        if row.get('role') == 'tool' and row.get('tool_name') == 'skill_view' and row.get('tool_call_id') in skill_calls:
+            result = json.loads(row['content'])
+            if result.get('success') is True and result.get('name') == 'illustrated-comic-delivery' and 'file' not in result:
+                parts = result['content'].split('---', 2)
+                if len(parts) == 3:
+                    loaded_skills.append(hashlib.sha256(parts[2].strip().encode()).hexdigest())
+    return {'tool_calls': calls, 'messages': len(rows), 'image_generation_attempts': image_attempts,
+            'loaded_skill_body_sha256': loaded_skills}
 
 
-def verify_trace(summary):
-    if not any(t['name'] == 'skill_view' and 'illustrated-comic-delivery' in t['arguments'] for t in summary['tool_calls']):
-        raise RuntimeError('Trace does not prove the optimized comic Skill was loaded')
+def verify_trace(summary, expected_sha256=None):
+    loaded = summary['loaded_skill_body_sha256']
+    if not loaded or (expected_sha256 is not None and expected_sha256 not in loaded):
+        raise RuntimeError('Trace does not prove the optimized comic Skill body was successfully loaded')
 
 
 class Assess(dspy.Signature):
@@ -245,6 +259,8 @@ def inspect_artifact(folder):
 def grade(folder, case, judge_lm):
     trace = json.loads((folder / 'trace.json').read_text(encoding='utf-8'))
     usage = trace_summary(trace)
+    receipt = json.loads((folder / 'receipt.json').read_text(encoding='utf-8'))
+    verify_trace(usage, receipt['candidate_sha256'])
     image_attempts = usage['image_generation_attempts']
     try:
         lesson, paths, checks = inspect_artifact(folder)
