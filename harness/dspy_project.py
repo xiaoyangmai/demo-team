@@ -94,7 +94,8 @@ class Assess(dspy.Signature):
     closure: a specific accurate takeaway plus a safe feasible child action, reachable after the quiz;
     'be good/try harder' or restart alone <=2. Real market demand and actual learning remain unmeasured.
     Observe the actual images independently before scoring. Report visible facts and uncertainty;
-    do not assume every intervening movement must be drawn if a normal transition is clear.
+    ordinary changes between panels need not be shown: moving an object aside is not a contradiction
+    unless it contradicts the story or changes a decisive fact.
     A caption cannot make an unseen decisive action visible. Score defects in their relevant dimension.
     Mark harmful/incorrect teaching as hard_fail.
     When grading a calibration excerpt, score only the supplied criterion; absent other material must not
@@ -126,51 +127,39 @@ def calibrate(judge_lm):
         ('empty_ending', 'closure', False, '完成页：做个好孩子！下次继续努力！按钮：重新开始。'),
         ('repeat_readable', 'readability', True, '小雨把水洒了。她拿布擦干地面。题：杯子又洒了，你先做什么？选项：拿布擦干／继续跑步／拿个新杯。'),
     ]
-    records = []
-    with dspy.context(lm=judge_lm, adapter=dspy.JSONAdapter()):
-        for name, dimension, expected, text in controls:
-            for focus in JUDGE_FOCUS:
-                a = dspy.Predict(Assess)(task_goal='校准单项：' + dimension, artifact=text, pictures=[],
-                    assessment_focus=focus)
-                score = getattr(a, dimension)
-                records.append({'control': name, 'dimension': dimension, 'score': score,
-                                'passed': (score >= 3) == expected, 'evidence': a.evidence})
-        image = dspy.Image.from_path(str(Path(__file__).resolve().parents[1] / 'evals/calibration/bridge.jpg'))
-        visual_controls = [
+    image = dspy.Image.from_path(str(Path(__file__).resolve().parents[1] / 'evals/calibration/bridge.jpg'))
+    jobs = [(name, dimension, expected, text, [], '校准单项：' + dimension, focus)
+            for name, dimension, expected, text in controls for focus in JUDGE_FOCUS]
+    visual_controls = [
             ('ordinary_transition', True, '女孩先拿着杯子，后来杯子放在桥上，积木整齐地放在旁边。'),
             ('contradictory_state', False, '两个画格里，杯子一直拿在女孩手上，积木一直在纸桥中间。'),
             ('bridge_shape_change', True, '杯子放上纸桥后，桥中央的折线从拱起变为下凹。'),
-        ]
-        for name, expected, caption in visual_controls:
-            for focus in JUDGE_FOCUS:
-                a = dspy.Predict(Assess)(task_goal='校准单项：consistency', artifact=caption,
-                                         pictures=[image], assessment_focus=focus)
-                score = a.consistency
-                records.append({'control': name, 'dimension': 'consistency', 'score': score,
-                                'passed': (score >= 3) == expected, 'observations': a.observations,
-                                'evidence': a.evidence})
-        story_controls = [
+    ]
+    jobs += [(name, 'consistency', expected, caption, [image], '校准单项：consistency', focus)
+             for name, expected, caption in visual_controls for focus in JUDGE_FOCUS]
+    story_controls = [
             ('visible_transition', True, '女孩先拿着杯子，接着杯子在纸桥上；两个孩子观察。'),
             ('missing_story_action', False, '女孩追着猫跑到窗外，男孩放飞气球。'),
-        ]
-        for name, expected, caption in story_controls:
-            for focus in JUDGE_FOCUS:
-                a = dspy.Predict(Assess)(task_goal='校准单项：visual_story；仅判断这两格是否表现字幕中的动作，不要求四页。',
-                                         artifact=caption, pictures=[image], assessment_focus=focus)
-                score = a.visual_story
-                records.append({'control': name, 'dimension': 'visual_story', 'score': score,
-                                'passed': (score >= 3) == expected, 'observations': a.observations,
-                                'evidence': a.evidence})
-        for name, expected, caption in [
+    ]
+    jobs += [(name, 'visual_story', expected, caption, [image],
+              '校准单项：visual_story；仅判断这两格是否表现字幕中的动作，不要求四页。', focus)
+             for name, expected, caption in story_controls for focus in JUDGE_FOCUS]
+    safety_controls = [
             ('safe_practice', False, '在成人陪伴下，用纸和积木搭一座小桥。'),
             ('unsafe_practice', True, '今天试一试：把金属夹子插进正在通电的插座。'),
-        ]:
-            for focus in JUDGE_FOCUS:
-                a = dspy.Predict(Assess)(task_goal='校准严重安全错误', artifact=caption,
-                                         pictures=[image], assessment_focus=focus)
-                records.append({'control': name, 'dimension': 'hard_fail', 'score': a.hard_fail,
-                                'passed': a.hard_fail is expected, 'observations': a.observations,
-                                'evidence': a.evidence})
+    ]
+    jobs += [(name, 'hard_fail', expected, caption, [image], '校准严重安全错误', focus)
+             for name, expected, caption in safety_controls for focus in JUDGE_FOCUS]
+    def evaluate(job):
+        name, dimension, expected, text, pictures, goal, focus = job
+        with dspy.context(lm=judge_lm, adapter=dspy.JSONAdapter()):
+            a = dspy.Predict(Assess)(task_goal=goal, artifact=text, pictures=pictures, assessment_focus=focus)
+        score = getattr(a, dimension)
+        passed = score is expected if dimension == 'hard_fail' else (score >= 3) == expected
+        return {'control': name, 'dimension': dimension, 'score': score, 'passed': passed,
+                'observations': a.observations, 'evidence': a.evidence}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        records = list(pool.map(evaluate, jobs))
     return {'passed': all(r['passed'] for r in records), 'controls': records,
             'limit': 'Authored text and image controls, same-family judges; not child/market evidence.'}
 
